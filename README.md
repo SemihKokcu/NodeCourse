@@ -11,3 +11,7 @@ temel http server kurulumu ve işlevli
 
     .vcode => run->addConfigration->
         burada debug çalışmaları için nodemon conf ettik. (npm i nodemon -g) 
+
+3-express
+    npm i --save express, npm i --save body-parser
+    
