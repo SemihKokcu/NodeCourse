@@ -27,6 +27,7 @@ exports.getProduct = (req, res, next) => {
 };
 
 exports.getIndex = (req, res, next) => {
+  
   Product.fetchAll()
     .then(([rows, fieldData]) => {
       res.render('shop/index', {
