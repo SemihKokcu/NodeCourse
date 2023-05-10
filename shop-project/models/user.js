@@ -17,7 +17,7 @@ class User {
   }
 
   addToCart(product) {
-    const cartProductIndex = this.cart.items?.findIndex(cp => {
+    const cartProductIndex = this.cart.items.findIndex(cp => {
       return cp.productId.toString() === product._id.toString();
     });
     let newQuantity = 1;
@@ -47,23 +47,45 @@ class User {
   getCart() {
     const db = getDb();
     const productIds = this.cart.items.map(i => {
-      return i.productId;
+        return i.productId;
     });
+
+    // Seçilen ürünlerin bilgilerini veritabanından al
     return db
-      .collection('products')
-      .find({ _id: { $in: productIds } })
-      .toArray()
-      .then(products => {
-        return products.map(p => {
-          return {
-            ...p,
-            quantity: this.cart.items.find(i => {
-              return i.productId.toString() === p._id.toString();
-            }).quantity
-          };
+        .collection('products')
+        .find({ _id: { $in: productIds } })
+        .toArray()
+        .then(products => {
+            // Sepetinizdeki ürünleri filtreleyin
+            const cartItems = this.cart.items.filter(item => {
+                const product = products.find(p => p._id.toString() === item.productId.toString());
+                return product !== undefined;
+            });
+
+            const itemsToRemove = this.cart.items.filter(item => {
+                const product = products.find(p => p._id.toString() === item.productId.toString());
+                return product === undefined;
+            });
+
+            // Kaldırılacak ürünleri sepetinizden kaldırın
+            if (itemsToRemove.length > 0) {
+                itemsToRemove.forEach(item => {
+                    this.cart.items.splice(this.cart.items.indexOf(item), 1);
+                });
+            }
+
+            // Sepetinizdeki ürünlerin bilgilerini güncelleyin ve döndürün
+            return products.map(p => {
+                const cartItem = cartItems.find(item => {
+                    return item.productId.toString() === p._id.toString();
+                });
+                return {
+                    ...p,
+                    quantity: cartItem.quantity
+                };
+            });
         });
-      });
-  }
+}
 
   deleteItemFromCart(productId) {
     const updatedCartItems = this.cart.items.filter(item => {
@@ -74,8 +96,40 @@ class User {
       .collection('users')
       .updateOne(
         { _id: new ObjectId(this._id) },
-        { $set: { cart: {items: updatedCartItems} } }
+        { $set: { cart: { items: updatedCartItems } } }
       );
+  }
+
+  addOrder() {
+    const db = getDb();
+    return this.getCart()
+      .then(products => {
+        const order = {
+          items: products,
+          user: {
+            _id: new ObjectId(this._id),
+            name: this.name
+          }
+        };
+        return db.collection('orders').insertOne(order);
+      })
+      .then(result => {
+        this.cart = { items: [] };
+        return db
+          .collection('users')
+          .updateOne(
+            { _id: new ObjectId(this._id) },
+            { $set: { cart: { items: [] } } }
+          );
+      });
+  }
+
+  getOrders() {
+    const db = getDb();
+    return db
+      .collection('orders')
+      .find({ 'user._id': new ObjectId(this._id) })
+      .toArray();
   }
 
   static findById(userId) {
